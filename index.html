@@ -3,9 +3,259 @@
 <html xml:lang="en" lang="en">
 <head>
     <title>CSE442 | Final Project</title>
+    <style>
+        .code {
+            font-family: Consolas, 'Courier New', monospace;
+            font-size: medium;
+            line-height: 100%;
+            background-color: #444;
+            padding: 1em;
+            margin-bottom: 1em;
+            word-break: normal;
+            border-radius: 5px;
+            color: #eee;
+        }
+        .red {
+            color:rgb(255, 42, 84);
+        }
+        .str {
+            color: rgb(93, 211, 93);
+        }
+        .var {
+            color: rgb(88, 173, 223)
+        }
+        .func {
+            color: rgb(240, 230, 98);
+        }
+        .set {
+            color: rgb(247, 5, 255);
+        }
+        .com {
+            color: #aaa
+        }
+    </style>
 </head>
-<body style="font-family: trebuchet ms">
-    <h1> Recognizing Birds </h1>
-    <h5> Nicco Garofalo & Aydan Bailey </h5>
- </body>
+<body style="background-color: #222;">
+    <div style="font-family: trebuchet ms; margin:auto; width: 80%;color: #eee;font-size:large;">
+        <h1 style="color: aqua;"> Recognizing Birds </h1>
+        <h3 style="color: aquamarine;"> Nicco Garofalo & Aydan Bailey </h3>
+        <p>For our project, we decided to create a neural network that could recognize different species of Birds.
+             We then entered it into the <span style="color: aqua;"><emph>Kaggle</emph></span> competition.</p>
+        <p>An analysis of our performance will be at the end of this page, but we will begin by stepping through our code.</p>
+        <div style="height: 1em;"></div>
+        <p>For our neural net, we used pytorch, so we begin by importing necessary pytorch components and notably, prioritizing use of the gpu over the cpu.</p>
+        <pre class="code">
+<span class="red">import</span> torch
+<span class="red">import</span> torchvision
+<span class="red">import</span> torchvision.transforms <span class="red">as</span> transforms
+<span class="red">import</span> numpy <span class="red">as</span> np
+<span class="red">import</span> torch.nn <span class="red">as</span> nn
+<span class="red">import</span> torch.nn.functional <span class="red">as</span> F
+<span class="red">import</span> torch.optim <span class="red">as</span> optim
+<span class="var">device</span> = torch.<span class="func">device</span>(<span class="str">"cuda:0"</span> <span class="red">if</span> torch.cuda.<span class="func">is_available</span>() <span class="red">else</span> <span class="str">"cpu"</span>)</pre>
+        <p>For the bulk of this project, we used Google Colab, so we needed to import the dataset from <span style="color: aqua;"><emph>Kaggle</emph></span> into a Google Drive. First, we had to give Colab access to our Drive. This mounts the drive, and adds a filepath that we'll use for storing our neural network as we train it.</p>        
+        <pre class="code">
+<span class="red">from</span> google.colab <span class="red">import</span> drive
+drive.<span class="func">mount</span>(<span class="str">'/content/drive'</span>, <span class="var">force_remount</span>=<span class="set">True</span>)
+<span class="var">checkpoints</span> = <span class="str">'/content/drive/MyDrive/455/birds/'</span></pre>
+        <p>Now, we import the dataset from <span style="color: aqua;"><emph>Kaggle</emph></span> by using command-line arguments in google colab.</p>
+        <pre class="code">
+<span class="red">from</span> google.colab <span class="red">import</span> files
+files.<span class="func">upload</span>()
+<span class="red">!</span>pip install -q kaggle
+<span class="red">!</span>mkdir ~/.kaggle
+<span class="red">!</span>cp kaggle.json ~/.kaggle/
+<span class="red">!</span>chmod 600 ~/.kaggle/kaggle.json
+<span class="red">!</span>kaggle datasets list
+<span class="red">!</span>kaggle competitions download -c 'birds-22wi'
+<span class="red">!</span>mkdir ./drive/MyDrive/455
+<span class="red">!</span>unzip birds-22wi.zip -d ./drive/MyDrive/455</pre>
+        <p>Now, we need to load the dataset into a format that we can use for training. We started with some code taken from the Pytorch Tutorials in class, and edited it to fit our needs. In particular, one of the challenges of this dataset is that not all of the images are the same size. We solve this by using transforms that resize the images, as well as adding some random crops to the training data.</p>
+        <pre class="code">
+<span class="set">def</span> <span class="func">get_birds_data</span>():
+    </span><span class="var">transform_train</span> = transforms.<span class="func">Compose</span>([
+        </span>transforms.<span class="func">Resize</span>((<span class="set">300</span>, <span class="set">300</span>)),
+        </span>transforms.<span class="func">RandomCrop</span>(<span class="set">256</span>, <span class="var">padding</span>=<span class="set">4</span>, <span class="var">padding_mode</span>=<span class="str">'edge'</span>),
+        </span>transforms.<span class="func">ToTensor</span>(),
+    ])
+    
+    <span class="var">transform_test</span> = transforms.<span class="func">Compose</span>([
+        </span>transforms.<span class="func">Resize</span>((256, 256)),
+        </span>transforms.<span class="func">ToTensor</span>(),
+    </span>])
+    </span>
+    </span><span class="var">trainset</span> = torchvision.datasets.<span class="func">ImageFolder</span>(<span class="var">root</span>=<span class="var">checkpoints</span> + <span class="str">'train/'</span>, <span class="var">transform</span>=<span class="var">transform_train</span>)
+    </span><span class="var">trainloader</span> = torch.utils.data.<span class="func">DataLoader</span>(<span class="var">trainset</span>, <span class="var">batch_size</span>=<span class="set">64</span>, <span class="var">shuffle</span>=<span class="set">True</span>, <span class="var">num_workers</span>=<span class="set">2</span>)
+    </span>
+    </span><span class="var">testset</span> = torchvision.datasets.<span class="func">ImageFolder</span>(<span class="var">root</span>=<span class="var">checkpoints</span> + <span class="str">'test/'</span>, <span class="var">transform</span>=<span class="var">transform_test</span>)
+    </span><span class="var">testloader</span> = torch.utils.data.<span class="func">DataLoader</span>(<span class="var">testset</span>, <span class="var">batch_size</span>=<span class="set">64</span>, <span class="var">shuffle</span>=<span class="set">False</span>, <span class="var">num_workers</span>=<span class="set">2</span>)
+    </span>
+    </span><span class="red">return</span> {<span class="str">'train'</span>: <span class="var">trainloader</span>, <span class="str">'test'</span>: <span class="var">testloader</span>}
+    </span>
+<span class="var">data</span> = <span class="func">get_birds_data</span>()</pre>
+        <p>When it came time to test, we tried several neural network architectures. The first was a very simple model that we could train quickly to make sure everything was working properly.</p>
+        <p>This first neural net had a single Convolutional layer followed by a single fully-connected layer. After running for 10 hours on a personal computer, it had completed 8 epochs which amounted to an accuracy of 1.7% for the test data. It was at this point that we realized that we must switch to Google Colab to utilize their advanced hardware.</p>
+        <p>Once we had worked out the bugs associated with transitioning from a local runtime to Google Colab, it gave us significantly improved processing power, so we decided to step up our Neural Net.</p>
+        <p>This 2nd major iteration of our Neural Net was adapted from the in-class tutorials using 5 convolutional layers and one fully connected layer, only changing the last parameter to ensure we had 555 outputs for our 555 species of birds.</p>
+        <p>This second iteration performed well, after a day of training, it managed to hit ~25% accuracy, but we knew we could do better.</p>
+        <p>This leads us to the 3rd and final major iteration of our neural network.</p>
+        <p>For this ultimate model, we did some research to determine what architectures might be best suited for this type of image classification. One model that we discovered was the highly influential 'AlexNet'. So, after researching the structure of AlexNet, we designed our architecture to utilize key features of AlexNet. The key features we noticed were as follows:</p>
+        <ul>
+            <li>Starting with a large 3-channel image, immediately expand the number of channels with 2d convolutions.</li>
+            <li>Do many convolutions, each time, increasing the number of channels and using pooling to decrease the 'height' and 'width' of the layer.</li>
+            <li>As layers progress, both the size of the convolutional filter and the rate of pooling should decrease.</li>
+            <li>The net should end with two fully connected layers, one that expands beyond the number of outputs, and then one that condenses to the outputs.</li>
+        </ul>
+        <p>We took these principles from AlexNet to devise our own neural network architecture, making changes to suit our data and our hardware's computational capabilities. This final version is shown below.</p>
+        <pre class="code">
+<span class="set">class</span> <span class="red">Darknet64</span>(nn.Module):
+    <span class="set">def</span> <span class="func">__init__</span>(self):
+        <span class="func">super</span>(<span class="red">Darknet64</span>, self).<span class="func">__init__</span>()
+        self.<span class="var">conv1</span> = nn.<span class="func">Conv2d</span>(<span class="set">3</span>, <span class="set">96</span>, <span class="set">5</span>, <span class="var">stride</span>=<span class="set">2</span>, <span class="var">padding</span>=<span class="set">1</span>, <span class="var">bias</span>=<span class="set">False</span>)
+        self.<span class="var">bn1</span> = nn.<span class="func">BatchNorm2d</span>(<span class="set">96</span>)
+
+        self.<span class="var">conv2</span> = nn.<span class="func">Conv2d</span>(<span class="set">96</span>, <span class="set">128</span>, <span class="set">3</span>, <span class="var">padding</span>=<span class="set">1</span>, <span class="var">bias</span>=<span class="set">False</span>)
+        self.<span class="var">bn2</span> = nn.<span class="func">BatchNorm2d</span>(<span class="set">128</span>)
+
+        self.<span class="var">conv3</span> = nn.<span class="func">Conv2d</span>(<span class="set">128</span>, <span class="set">192</span>, <span class="set">3</span>, <span class="var">padding</span>=<span class="set">1</span>, <span class="var">bias</span>=<span class="set">False</span>)
+        self.<span class="var">bn3</span> = nn.<span class="func">BatchNorm2d</span>(<span class="set">192</span>)
+
+        self.<span class="var">conv4</span> = nn.<span class="func">Conv2d</span>(<span class="set">192</span>, <span class="set">192</span>, <span class="set">3</span>, <span class="var">padding</span>=<span class="set">1</span>, <span class="var">bias</span>=<span class="set">False</span>)
+        self.<span class="var">bn4</span> = nn.<span class="func">BatchNorm2d</span>(<span class="set">192</span>)
+
+        self.<span class="var">conv5</span> = nn.<span class="func">Conv2d</span>(<span class="set">192</span>, <span class="set">256</span>, <span class="set">3</span>, <span class="var">padding</span>=<span class="set">1</span>, <span class="var">bias</span>=<span class="set">False</span>)
+        self.<span class="var">bn5</span> = nn.<span class="func">BatchNorm2d</span>(<span class="set">256</span>)
+
+        self.<span class="var">fc1</span> = nn.<span class="func">Linear</span>(<span class="set">256</span>, <span class="set">2048</span>)
+
+        self.<span class="var">fc2</span> = nn.<span class="func">Linear</span>(<span class="set">2048</span>, <span class="set">555</span>)
+
+    <span class="set">def</span> <span class="func">forward</span>(self, <span class="var">x</span>):
+
+        <span class="com"># Input is 3 x 256 x 256 (c,h,w)</span>
+        <span class="var">x</span> = F.<span class="func">max_pool2d</span>(F.<span class="func">relu</span>(self.<span class="func">bn1</span>(self.<span class="func">conv1</span>(<span class="var">x</span>))), <span class="var">kernel_size</span>=<span class="set">4</span>, <span class="var">stride</span>=<span class="set">4</span>) <span class="com"># 64x64x96</span>
+        <span class="var">x</span> = F.<span class="func">max_pool2d</span>(F.<span class="func">relu</span>(self.<span class="func">bn2</span>(self.<span class="func">conv2</span>(<span class="var">x</span>))), <span class="var">kernel_size</span>=<span class="set">2</span>, <span class="var">stride</span>=<span class="set">2</span>) <span class="com"># 32x32x128</span>
+        <span class="var">x</span> = F.<span class="func">max_pool2d</span>(F.<span class="func">relu</span>(self.<span class="func">bn3</span>(self.<span class="func">conv3</span>(<span class="var">x</span>))), <span class="var">kernel_size</span>=<span class="set">2</span>, <span class="var">stride</span>=<span class="set">2</span>) <span class="com"># 16x16x192</span>
+        <span class="var">x</span> = F.<span class="func">relu</span>(self.<span class="func">bn4</span>(self.<span class="func">conv4</span>(<span class="var">x</span>)))                                        <span class="com"># 16x16x192</span>
+        <span class="var">x</span> = F.<span class="func">relu</span>(self.<span class="func">bn5</span>(self.<span class="func">conv5</span>(<span class="var">x</span>)))                                        <span class="com"># 16x16x256</span>
+
+        <span class="var">x</span> = F.<span class="func">adaptive_avg_pool2d</span>(<span class="var">x</span>, <span class="set">1</span>)                                            <span class="com"># 1x1x256</span>
+        <span class="var">x</span> = torch.<span class="func">flatten</span>(<span class="var">x</span>, <span class="set">1</span>)                                                    <span class="com"># vector 256</span>
+        
+        <span class="var">x</span> = self.<span class="func">fc1</span>(<span class="var">x</span>)
+        <span class="var">x</span> = self.<span class="func">fc2</span>(<span class="var">x</span>)
+        <span class="red">return</span> <span class="var">x</span></pre>
+        <p>Then, to train our neural network, we realized that the <span class="func">train</span>() function shown in the in-class pytorch tutorial fully suited our needs, so we used it without modification. The most notable feature of its implementation is the ability to save and load states of the neural network. This feature was instrumental to our success because we would let the neural network train for days, but that would be broken up by Google Colab kicking us from the servers when we had utilized our allowance for GPU processing time.</p>
+        <p class="code" style="cursor:pointer" onclick="clickTrain()">Click to <span id="revhide">reveal</span> the <span class="func">train</span>() function.</p>
+        <pre class="code" id="traincode" style="display:none">
+def train(net, dataloader, epochs=1, start_epoch=0, lr=0.01, momentum=0.9, decay=0.0005, 
+          verbose=1, print_every=10, state=None, schedule={}, checkpoint_path=None):
+    net.to(device)
+    net.train()
+    losses = []
+    criterion = nn.CrossEntropyLoss()
+    optimizer = optim.SGD(net.parameters(), lr=lr, momentum=momentum, weight_decay=decay)
+
+    # Load previous training state
+    if state:
+        net.load_state_dict(state['net'])
+        optimizer.load_state_dict(state['optimizer'])
+        start_epoch = state['epoch']
+        losses = state['losses']
+
+    # Fast forward lr schedule through already trained epochs
+    for epoch in range(start_epoch):
+        if epoch in schedule:
+            print ("Learning rate: %f"% schedule[epoch])
+            for g in optimizer.param_groups:
+                g['lr'] = schedule[epoch]
+
+    for epoch in range(start_epoch, epochs):
+        sum_loss = 0.0
+
+        # Update learning rate when scheduled
+        if epoch in schedule:
+            print ("Learning rate: %f"% schedule[epoch])
+            for g in optimizer.param_groups:
+                g['lr'] = schedule[epoch]
+
+        for i, batch in enumerate(dataloader, 0):
+            inputs, labels = batch[0].to(device), batch[1].to(device)
+
+            optimizer.zero_grad()
+
+            outputs = net(inputs)
+            loss = criterion(outputs, labels)
+            loss.backward()  # autograd magic, computes all the partial derivatives
+            optimizer.step() # takes a step in gradient direction
+
+            losses.append(loss.item())
+            sum_loss += loss.item()
+            
+            if i % print_every == print_every-1:    # print every 10 mini-batches
+                if verbose:
+                    print('[%d, %5d] loss: %.3f' % (epoch, i + 1, sum_loss / print_every))
+                sum_loss = 0.0
+        if checkpoint_path:
+            state = {'epoch': epoch+1, 'net': net.state_dict(), 'optimizer': optimizer.state_dict(), 'losses': losses}
+            torch.save(state, checkpoint_path + 'checkpoint-%d.pkl'%(epoch+1))
+    return losses
+
+def accuracy(net, dataloader):
+    net.to(device)
+    net.eval()
+    correct = 0
+    total = 0
+    with torch.no_grad():
+        for batch in dataloader:
+            images, labels = batch[0].to(device), batch[1].to(device)
+            outputs = net(images)
+            _, predicted = torch.max(outputs.data, 1)
+            total += labels.size(0)
+            correct += (predicted == labels).sum().item()
+    return correct/total
+
+def smooth(x, size):
+    return np.convolve(x, np.ones(size)/size, mode='valid')</pre>
+        <p>This next block of code is what we used to train our neural network.</p>
+        <p>One thing of note with our schedule is that we had never intended to run so many epochs. We initially planned for 15 because it seemed like a reasonable number and we would only have diminishing returns afterwards.</p>
+        <p>But, after completing all 15 epochs, our neural net's accuracy was barely 30%, not nearly competitive with some other students in the class.</p>
+        <p>So, we doubled it and planned for 30 epochs. But this time, we realized that from epoch 20-30, the loss of the model hardly changed at all, we had decreased our learning rate too quickly. Since our model was already quite functional, we didn't want to start from scratch again, so we messed around with increasing the learning rate. We found the highest learning rate that did not also increase our loss. And from this point, we made sure to really let the neural network train at each learning rate before gradually decreasing it.</p>
+        <p>This all lead us to the final schedule, which is shown below.</p>
+        <pre class="code">
+<span class="var">net</span> = <span class="red">Darknet64</span>()
+<span class="var">state</span> = torch.<span class="func">load</span>(<span class="var">checkpoints</span> + <span class="str">'checkpoint-??.pkl'</span>)
+<span class="var">schedule</span>={0:.1, 4:.01, 9:.001, 20:.0001,30:0.001,44:0.0005,55:0.0002,65:0.0001}
+<span class="var">losses</span> = <span class="func">train</span>(<span class="var">net</span>, <span class="var">data</span>[<span class="str">'train'</span>], <span class="var">epochs</span>=<span class="set">70</span>, <span class="var">schedule</span>=<span class="var">schedule</span>, <span class="var">checkpoint_path</span>=<span class="var">checkpoints</span>, <span class="var">state</span>=<span class="var">state</span>)</pre>
+        <p>Another challenge with this dataset is matching up the correct labels to the images. While the images are stored inside folders with the proper labels on them (numbered 0, 1, 2, 3...), the dataloader does not load these folders in counting order. It loads according to the first-lowest digits, e.g. (0, 1, 10, 100, 101, 102...), and identifies those folders as 0, 1, 2, 3... So, while labels 0 and 1 are correct, the species that our model labels as 2 is actually found in folder #10 (the critearia used by Kaggle). The pattern continues as follows: (3 -> 100), (4 -> 101), (5 -> 102), and so on. To get around, we created a map from our neural network's labels to Kaggle's labels.</p>
+        <p>The code below goes through the training data, uses the label assigned by the neural network as the index, and extracts the corresponding folder id for that label.</p>
+        <pre class="code">
+<span class="var">list</span> = []
+
+<span class="red">for</span> <span class="var">element</span> <span class="red">in</span> <span class="var">data</span>[<span class="str">'train'</span>].dataset.samples:
+    <span class="red">if</span> <span class="func">len</span>(<span class="var">list</span>) <= <span class="var">element</span>[<span class="set">1</span>]:
+    <span class="var">list</span>.<span class="func">insert</span>(<span class="var">element</span>[<span class="set">1</span>], <span class="func">int</span>(<span class="var">element</span>[<span class="set">0</span>][<span class="set">39</span>:<span class="set">-37</span>]))</pre>
+        <p>The last major step is to run the test images through our model and generate a csv file corresponding to our neural net's prediction of each bird. This file is uploaded to Kaggle, which returns our percentage correctness. This test function runs the test images through the model that we wish to test, and uses the aforementioned list to convert the labels to the correct ones. The output is then written to a file.</p>
+        <pre class="code">
+<span class="red">def</span> <span class="func">test</span>(net, dataloader):
+    net.<span class="func">to</span>(<span class="var">device</span>)
+    <span class="red">with</span> <span class="func">open</span>(<span class="var">checkpoints</span> + <span class="str">'testOutput.csv'</span>, <span class="str">'at'</span>) <span class="red">as</span> f:
+        <span class="red">with</span> torch.<span class="func">no_grad</span>():
+            f.<span class="func">write</span>(<span class="str">'{},{}\n'</span>.<span class="func">format</span>(<span class="str">'path'</span>, <span class="str">'class'</span>))
+            <span class="red">for</span> <span class="var">i</span>, (<span class="var">images</span>, <span class="var">labels</span>) <span class="red">in</span> <span class="func">enumerate</span>(dataloader, <span class="set">0</span>):
+                <span class="func">print</span>(<span class="var">i</span>)
+                <span class="var">outputs</span> = net(<span class="var">images</span>)
+                _, <span class="var">predicted</span> = torch.<span class="func">max</span>(<span class="var">outputs</span>.data, <span class="set">1</span>)
+                <span class="red">for</span> <span class="var">j</span> <span class="red">in</span> <span class="func">range</span>(<span class="func">len</span>(<span class="var">predicted</span>)):
+                <span class="var">fnames</span> = <span class="str">'test/{}'</span>.<span class="func">format</span>(<span class="func">str</span>(dataloader.dataset.samples[<span class="var">i</span>*<span class="set">64</span> + <span class="var">j</span>][<span class="set">0</span>])[<span class="set">40</span>:])
+                    f.<span class="func">write</span>(<span class="str">'{},{}\n'</span>.<span class="func">format</span>(<span class="var">fnames</span>, <span class="var">list</span>[<span class="var">predicted</span>[<span class="var">j</span>]]))</pre>
+        <p>Finally, we run our test function on our trained neural net, given by the saved state-file of the net.</p>
+        <pre class="code">
+<span class="var">net</span> = <span class="red">Darknet64</span>()
+<span class="var">state</span> = torch.<span class="func">load</span>(<span class="var">checkpoints</span> + <span class="str">'checkpoint-30.pkl'</span>)
+<span class="var">net</span>.<span class="func">load_state_dict</span>(<span class="var">state</span>[<span class="str">'net'</span>])
+<span class="func">test</span>(<span class="var">net</span>, <span class="var">data</span>[<span class="str">'test'</span>])</pre>
+    </div>
+<script src="helper.js"></script>
+</body>
 </html> 
