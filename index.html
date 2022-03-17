@@ -225,7 +225,7 @@ def smooth(x, size):
         <pre class="code">
 <span class="var">net</span> = <span class="red">Darknet64</span>()
 <span class="var">state</span> = torch.<span class="func">load</span>(<span class="var">checkpoints</span> + <span class="str">'checkpoint-??.pkl'</span>)
-<span class="var">schedule</span>={0:.1, 4:.01, 9:.001, 20:.0001,30:0.001,44:0.0005,55:0.0002,65:0.0001}
+<span class="var">schedule</span>=<span style="color: orange;">{0:.1, 4:.01, 9:.001, 20:.0001,30:0.001,44:0.0005,55:0.0002,65:0.0001}</span>
 <span class="var">losses</span> = <span class="func">train</span>(<span class="var">net</span>, <span class="var">data</span>[<span class="str">'train'</span>], <span class="var">epochs</span>=<span class="set">70</span>, <span class="var">schedule</span>=<span class="var">schedule</span>, <span class="var">checkpoint_path</span>=<span class="var">checkpoints</span>, <span class="var">state</span>=<span class="var">state</span>)</pre>
         <p>Another challenge with this dataset is matching up the correct labels to the images. While the images are stored inside folders with the proper labels on them (numbered 0, 1, 2, 3...), the dataloader does not load these folders in counting order. It loads according to the first-lowest digits, e.g. (0, 1, 10, 100, 101, 102...), and identifies those folders as 0, 1, 2, 3... So, while labels 0 and 1 are correct, the species that our model labels as 2 is actually found in folder #10 (the critearia used by Kaggle). The pattern continues as follows: (3 -> 100), (4 -> 101), (5 -> 102), and so on. To get around, we created a map from our neural network's labels to Kaggle's labels.</p>
         <p>The code below goes through the training data, uses the label assigned by the neural network as the index, and extracts the corresponding folder id for that label.</p>
@@ -255,6 +255,29 @@ def smooth(x, size):
 <span class="var">state</span> = torch.<span class="func">load</span>(<span class="var">checkpoints</span> + <span class="str">'checkpoint-30.pkl'</span>)
 <span class="var">net</span>.<span class="func">load_state_dict</span>(<span class="var">state</span>[<span class="str">'net'</span>])
 <span class="func">test</span>(<span class="var">net</span>, <span class="var">data</span>[<span class="str">'test'</span>])</pre>
+        <div style="height: 3em;"></div>
+        <h3 style="color: aquamarine;">Performance & Analysis</h3>
+        <p>Ultimately, our neural net ended with <span style="color: orange;">%</span> accuracy which, in itself, is quite good considering the AI has to choose between 555 species of birds, meaning the expected accuracy is 0.18%.</p>
+        <p>But, considering the best AI in the class identified birds with a rate of ~80% accuracy, it indicates that there was significant room for improvement with our neural net.</p>
+        <p>Shown below is a graph of the loss of our neural network over time. On the x-axis is the batch number. (Each batch corresponds with 64 images being used in training our neural network). On the y-axis is the loss of our neural network. You will notice that the loss flattens off in the approximate batch range [12000, 18000]. This corresponds to the issue we discussed earlier of decreasing our learning rate too much too soon.</p>
+        <p>But, we managed to continue bringing the loss down by increasing our learning rate once again and from there, gradually decreasing it.</p>
+        <p>Note: We submitted the test values of our neural network at losses of 5.5, 2.7, 1.8, and 1.2. The test accuracies of these losses were 1.7%, 29%, 39%, and 40% respectively.</p>
+        <p>These data points highlight two important takeaways from this project:</p>
+        <ol>
+            <li>Decreasing the loss of a neural net generally increases the accuracy of the network.</li>
+            <li>A change in loss does not correspond to a proportional change in in accuracy.</li>
+        </ol>
+        <p>The accuracy vs. loss graph is shown below. Note that the losses have been converted to negative numbers to better reflect how as the neural network was trained more, loss got closer to 0 and accuracy increased.</p>
+        <p>Clearly, the efficacy of our neural network tapered off. A ~33% decrease in loss ultiamately corresponded with a ~2% increase in accuracy. This indicated to us that improving our loss further would do little to improve overall accuracy, and with diminishing returns there was not much we could do. The state of our neural net could not reasonably be trained to compete with the top of our class and hit 70%+ accuracy.</p>
+        <p>We have two hypotheses for why this might have been the case.</p>
+        <p>First, our neural net could have just been bad. It is practically impossible to design a perfect neural network, and maybe some of the tradeoffs we made for runtime-performance hurt our efficacy-performance in the task at hand. So, if we were to try this again, we would conduct further research into designing the structure of neural networks and instead of testing one model, test many architechtures simultaneously so that we're not 'putting all of our eggs in one basket'</p>
+        <p>Second, we think our neural network could have gotten stuck at a 'local maximum' that is somewhat effective for the training data, but not for the task overall. We noticed early on that our neural network would frequently pick birds based on their surroundings. For instance, it predicted that a swan was a duck  even though the two birds look nothing alike. We believe the AI did this because the swan was swimming and the most of the training picutres of the duck also showed the duck swimming. So, it is possible that our neural network is heavily reliant on the background and the ecosystem of the bird, which is a useful observation, but is problematic because many birds share the same ecosystem.</p>
+        <p>Therefore, we believe that this reliance on background has allowed our neural net to get better at recognizing birds based primarily on its environment which is constant throughout the training data, but not all data for a particular bird. This in turn has lead to improvements in loss for the training data, but minimal improvement with the test data.</p>
+        <p>This all has lead to our AI getting stuck at local maximum, where it can get better at recognizing the environment of birds, but this predictor is far worse than just identifying the bird in the image itself.</p>
+        <h4 style="color: aquamarine;">How did this happen?</h4>
+        <p>We believe that this issue of local maximum came about be decreasing our learning rate too much too quickly. We were too eager for the quick drop-offs in loss that occur when you decrease the learning rate. This forced the AI to use the current best-strategy that it learned from the very beginning and carry that strategy all the way to the end.</p>
+        <p>Based on what I've mentioned previously, this best strategy was probably identifying the backgrounds in the images.</p>
+        <p>So, if we were to attempt this again, we would certainly let the neural net train at a relatively high (and volatile) learning rate for an extended period of time. We hope that this would lead to more experimentation by the neural network and allow it to 'realize' that the best strategy is actually identifying the bird in the image. And once we see that the loss has stabilized and found the global maximum strategy, from that point onwards, we will gradually decrease the learning rate until optimal accuracy is reached.</p>
     </div>
 <script src="helper.js"></script>
 </body>
