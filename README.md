@@ -1,4 +1,4 @@
-# 455-Wi22-Final
+# 455-Wi22-Final - Nicco Garofalo & Aydan Bailey
 
 Link to Summary Youtube Video:
 https://youtu.be/fXW35FxG9CM
