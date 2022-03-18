@@ -145,6 +145,8 @@ files.<span class="func">upload</span>()
         <span class="var">x</span> = self.<span class="func">fc1</span>(<span class="var">x</span>)
         <span class="var">x</span> = self.<span class="func">fc2</span>(<span class="var">x</span>)
         <span class="red">return</span> <span class="var">x</span></pre>
+        <p>The visual diagram showing thhe architecutre of our Neural Network is shown below:</p>
+        <img src="net_diagram.png"></img>
         <p>Then, to train our neural network, we realized that the <span class="func">train</span>() function shown in the in-class pytorch tutorial fully suited our needs, so we used it without modification. The most notable feature of its implementation is the ability to save and load states of the neural network. This feature was instrumental to our success because we would let the neural network train for days, but that would be broken up by Google Colab kicking us from the servers when we had utilized our allowance for GPU processing time.</p>
         <p class="code" style="cursor:pointer" onclick="clickTrain()">Click to <span id="revhide">reveal</span> the <span class="func">train</span>() function.</p>
         <pre class="code" id="traincode" style="display:none">
