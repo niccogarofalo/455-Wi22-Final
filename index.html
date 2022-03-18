@@ -145,8 +145,8 @@ files.<span class="func">upload</span>()
         <span class="var">x</span> = self.<span class="func">fc1</span>(<span class="var">x</span>)
         <span class="var">x</span> = self.<span class="func">fc2</span>(<span class="var">x</span>)
         <span class="red">return</span> <span class="var">x</span></pre>
-        <p>The visual diagram showing thhe architecutre of our Neural Network is shown below:</p>
-        <img src="net_diagram.png"></img>
+        <p>The visual diagram showing the architecutre of our Neural Network is shown below:</p>
+        <img src="net_diagram.png" style="width:60%;" alt="(Diagram of Neural Network)">
         <p>Then, to train our neural network, we realized that the <span class="func">train</span>() function shown in the in-class pytorch tutorial fully suited our needs, so we used it without modification. The most notable feature of its implementation is the ability to save and load states of the neural network. This feature was instrumental to our success because we would let the neural network train for days, but that would be broken up by Google Colab kicking us from the servers when we had utilized our allowance for GPU processing time.</p>
         <p class="code" style="cursor:pointer" onclick="clickTrain()">Click to <span id="revhide">reveal</span> the <span class="func">train</span>() function.</p>
         <pre class="code" id="traincode" style="display:none">
@@ -227,7 +227,7 @@ def smooth(x, size):
         <pre class="code">
 <span class="var">net</span> = <span class="red">Darknet64</span>()
 <span class="var">state</span> = torch.<span class="func">load</span>(<span class="var">checkpoints</span> + <span class="str">'checkpoint-??.pkl'</span>)
-<span class="var">schedule</span>=<span style="color: orange;">{0:.1, 4:.01, 9:.001, 20:.0001,30:0.001,44:0.0005,55:0.0002,65:0.0001}</span>
+<span class="var">schedule</span>=<span>{0:.1, 4:.01, 9:.001, 20:.0001,30:0.001,44:0.0005,58:0.0002}</span>
 <span class="var">losses</span> = <span class="func">train</span>(<span class="var">net</span>, <span class="var">data</span>[<span class="str">'train'</span>], <span class="var">epochs</span>=<span class="set">70</span>, <span class="var">schedule</span>=<span class="var">schedule</span>, <span class="var">checkpoint_path</span>=<span class="var">checkpoints</span>, <span class="var">state</span>=<span class="var">state</span>)</pre>
         <p>Another challenge with this dataset is matching up the correct labels to the images. While the images are stored inside folders with the proper labels on them (numbered 0, 1, 2, 3...), the dataloader does not load these folders in counting order. It loads according to the first-lowest digits, e.g. (0, 1, 10, 100, 101, 102...), and identifies those folders as 0, 1, 2, 3... So, while labels 0 and 1 are correct, the species that our model labels as 2 is actually found in folder #10 (the critearia used by Kaggle). The pattern continues as follows: (3 -> 100), (4 -> 101), (5 -> 102), and so on. To get around, we created a map from our neural network's labels to Kaggle's labels.</p>
         <p>The code below goes through the training data, uses the label assigned by the neural network as the index, and extracts the corresponding folder id for that label.</p>
@@ -259,9 +259,10 @@ def smooth(x, size):
 <span class="func">test</span>(<span class="var">net</span>, <span class="var">data</span>[<span class="str">'test'</span>])</pre>
         <div style="height: 3em;"></div>
         <h3 style="color: aquamarine;">Performance & Analysis</h3>
-        <p>Ultimately, our neural net ended with <span style="color: orange;">%</span> accuracy which, in itself, is quite good considering the AI has to choose between 555 species of birds, meaning the expected accuracy is 0.18%.</p>
+        <p>Ultimately, our neural net ended with <emph>40.6%</emph> accuracy which, in itself, is quite good considering the AI has to choose between 555 species of birds, meaning the expected accuracy is 0.18%.</p>
         <p>But, considering the best AI in the class identified birds with a rate of ~80% accuracy, it indicates that there was significant room for improvement with our neural net.</p>
         <p>Shown below is a graph of the loss of our neural network over time. On the x-axis is the batch number. (Each batch corresponds with 64 images being used in training our neural network). On the y-axis is the loss of our neural network. You will notice that the loss flattens off in the approximate batch range [12000, 18000]. This corresponds to the issue we discussed earlier of decreasing our learning rate too much too soon.</p>
+        <img src="lossVsBatch.png" style="width:25%;">
         <p>But, we managed to continue bringing the loss down by increasing our learning rate once again and from there, gradually decreasing it.</p>
         <p>Note: We submitted the test values of our neural network at losses of 5.5, 2.7, 1.8, and 1.2. The test accuracies of these losses were 1.7%, 29%, 39%, and 40% respectively.</p>
         <p>These data points highlight two important takeaways from this project:</p>
@@ -270,6 +271,7 @@ def smooth(x, size):
             <li>A change in loss does not correspond to a proportional change in in accuracy.</li>
         </ol>
         <p>The accuracy vs. loss graph is shown below. Note that the losses have been converted to negative numbers to better reflect how as the neural network was trained more, loss got closer to 0 and accuracy increased.</p>
+        <img src="Accuracy_vs_loss.png" style="width:25%;">
         <p>Clearly, the efficacy of our neural network tapered off. A ~33% decrease in loss ultiamately corresponded with a ~2% increase in accuracy. This indicated to us that improving our loss further would do little to improve overall accuracy, and with diminishing returns there was not much we could do. The state of our neural net could not reasonably be trained to compete with the top of our class and hit 70%+ accuracy.</p>
         <p>We have two hypotheses for why this might have been the case.</p>
         <p>First, our neural net could have just been bad. It is practically impossible to design a perfect neural network, and maybe some of the tradeoffs we made for runtime-performance hurt our efficacy-performance in the task at hand. So, if we were to try this again, we would conduct further research into designing the structure of neural networks and instead of testing one model, test many architechtures simultaneously so that we're not 'putting all of our eggs in one basket'</p>
